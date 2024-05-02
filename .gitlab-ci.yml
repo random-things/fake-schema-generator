@@ -1,0 +1,39 @@
+image: "docker:latest"
+services:
+  - docker:dind
+
+variables:
+  TEST_IMAGE: registry.gitlab.teh.me/me/fake-schema-generator:$CI_COMMIT_REF_NAME
+  RELEASE_IMAGE: registry.gitlab.teh.me/me/fake-schema-generator:latest
+
+before_script:
+  - docker login -u gitlab-ci-token -p $CI_JOB_TOKEN registry.gitlab.teh.me
+
+stages:
+  - Build
+  - Test
+  - Release
+
+build:
+  stage: Build
+  script:
+    - docker build --pull -t $TEST_IMAGE .
+    - docker push $TEST_IMAGE
+
+pytest:
+  stage: Test
+  script:
+    - docker pull $TEST_IMAGE
+    - docker run $TEST_IMAGE poetry run black --check .
+    - docker run $TEST_IMAGE poetry run isort -c .
+    - docker run $TEST_IMAGE poetry run pytest
+
+
+release:
+  stage: Release
+  script:
+    - docker pull $TEST_IMAGE
+    - docker tag $TEST_IMAGE $RELEASE_IMAGE
+    - docker push $RELEASE_IMAGE
+  only:
+    - master
