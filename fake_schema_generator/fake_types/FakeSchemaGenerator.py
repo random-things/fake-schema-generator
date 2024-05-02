@@ -300,7 +300,7 @@ class FakeSchemaGenerator:
                         [
                             cond.comparison(
                                 getattr(source_model, cond.field, None),
-                                (getattr(instance, cond.field) if isinstance(cond.value, ValueOf) else cond.value),
+                                (getattr(instance, cond.value.field) if isinstance(cond.value, ValueOf) else cond.value),
                             )
                             for cond in conditions
                         ]

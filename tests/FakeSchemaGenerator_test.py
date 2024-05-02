@@ -83,7 +83,7 @@ class OrderProduct:
             "reference",
             model="Product",
             field="price",
-            conditions=[SchemaCondition("id", operator.eq, ValueOf("product_id"))],
+            conditions=[SchemaCondition("product_id", operator.eq, ValueOf("id"))],
         ),
     ]
 
