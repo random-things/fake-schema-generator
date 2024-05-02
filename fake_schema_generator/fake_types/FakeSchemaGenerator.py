@@ -235,12 +235,12 @@ class FakeSchemaGenerator:
             col_values = []
             for instance in rows:
                 row_values = [getattr(instance, f) for f in fields]
-                row_value = row_op(*row_values)
+                row_value = row_op(row_values)
                 col_values.append(row_value)
             if len(col_values) == 1:
                 return col_values[0]
             else:
-                return col_op(*col_values)
+                return col_op(col_values)
 
     def generate_from_dag(self):
         if len(self._model_dependencies) == 0:

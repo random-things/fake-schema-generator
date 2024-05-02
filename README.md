@@ -9,6 +9,10 @@
     * [`CalculateProvider`](#calculateprovider)
     * [`ReferenceProvider`](#referenceprovider)
     * [`SequentialNumberProvider`](#sequentialnumberprovider)
+* [Operators](#operators)
+    * [`noop`](#noop)
+    * [`typed_product`](#typed_product)
+    * [`typed_sum`](#typed_sum)
 * [Types](#types)
     * [`FakeType`](#faketype)
     * [`ValueOf`](#valueof)
@@ -99,8 +103,8 @@ type TotalAmount = Annotated[
         field="order_id",
         value=ValueOf("order_id"),
         fields=["unit_price", "quantity"],
-        row_op=operator.mul,
-        col_op=operator.add,
+        row_op=typed_product,
+        col_op=typed_sum,
     ),
 ]
 ```
@@ -149,6 +153,20 @@ type CustomerRowID = Annotated[int, FakeType("sequential_number", namespace="cus
 class Customer:
     id: CustomerRowID
 ```
+
+## Operators
+
+### `noop`
+
+A function that does nothing. It's used as a placeholder for the `row_op` and `col_op` arguments in the `FakeType`.
+
+### `typed_product`
+
+A function that multiplies the values in a sequence.
+
+### `typed_sum`
+
+A function that sums the values in a sequence, similar to `sum()`, but enforces types.
 
 ## Types
 

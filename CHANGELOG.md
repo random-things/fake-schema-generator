@@ -15,6 +15,7 @@ Current development version: [v0.1.0](#v010)
 * [v0.1.0](#v010) - 2024-05-02
 
 ### v0.1.0
+* 🐛 `operator.add` and `operator.mul` take two arguments, replaced with `typed_sum` and `typed_product`
 * 📝 Adding a changelog
 * 📝 Writing documentation and adding a license
 * ♻️ Refactoring `SchemaCondition` parameter order to be more intuitive
@@ -39,3 +40,6 @@ Current development version: [v0.1.0](#v010)
 * ♻️ Add a `ProviderGenerator` to `FakeSchemaGenerator` to get rid of intermediate `Provider` classes that just 
   forward calls to faker
 * ♻️ Update `ProductNameGenerator` to generate more plausible product names
+* ♻️ Add a way to ensure that each row in a table has at least one corresponding row in another table
+  * Specifically, when generating the example schema, there are 100 `Order`s, but many of them have no associated
+    `OrderProducts`. However, in a real database, each `Order` would have at least one `OrderProduct`.

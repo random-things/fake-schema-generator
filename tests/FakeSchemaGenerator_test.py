@@ -8,6 +8,8 @@ from fake_schema_generator import FakeSchemaGenerator
 from fake_schema_generator import FakeType
 from fake_schema_generator import SchemaCondition
 from fake_schema_generator import ValueOf
+from fake_schema_generator import typed_product
+from fake_schema_generator import typed_sum
 
 
 @pytest.fixture
@@ -45,8 +47,8 @@ class Product:
             field="id",
             value=ValueOf("id"),
             fields=["price", "stock_quantity"],
-            row_op=operator.mul,
-            col_op=operator.add,
+            row_op=typed_product,
+            col_op=typed_sum,
         ),
     ]
 
@@ -64,8 +66,8 @@ class Order:
             field="order_id",
             value=ValueOf("id"),
             fields=["unit_price", "quantity"],
-            row_op=operator.mul,
-            col_op=operator.add,
+            row_op=typed_product,
+            col_op=typed_sum,
         ),
     ]
     order_status: Annotated[str, FakeType("random_element", elements=("Pending", "Shipped", "Delivered", "Returned"))]

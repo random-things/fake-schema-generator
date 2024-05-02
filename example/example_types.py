@@ -5,6 +5,8 @@ from typing import Annotated
 from fake_schema_generator import FakeType
 from fake_schema_generator import SchemaCondition
 from fake_schema_generator import ValueOf
+from fake_schema_generator import typed_product
+from fake_schema_generator import typed_sum
 
 type CustomerRowID = Annotated[int, FakeType("sequential_number", namespace="customer")]
 type FirstName = Annotated[str, FakeType("first_name")]
@@ -24,8 +26,8 @@ type TotalAmount = Annotated[
         field="order_id",
         value=ValueOf("order_id"),
         fields=["unit_price", "quantity"],
-        row_op=operator.mul,
-        col_op=operator.add,
+        row_op=typed_product,
+        col_op=typed_sum,
     ),
 ]
 type OrderStatus = Annotated[
