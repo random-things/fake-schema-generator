@@ -1,10 +1,29 @@
 # Fake Schema Generator
 
+## Table of Contents
+
+* [Requirements](#requirements)
+* [Example](#example)
+* [How does it work?](#how-does-it-work)
+* [Providers](#providers)
+    * [`CalculateProvider`](#calculateprovider)
+    * [`ReferenceProvider`](#referenceprovider)
+    * [`SequentialNumberProvider`](#sequentialnumberprovider)
+* [Types](#types)
+    * [`FakeType`](#faketype)
+    * [`ValueOf`](#valueof)
+    * [`SchemaCondition`](#schemacondition)
+* [Questions](#questions)
+    * [Why do I need Fake Schema Generator?](#why-do-i-need-fake-schema-generator)
+    * [I have no clue what you're talking about.](#i-have-no-clue-what-youre-talking-about)
+    * [Isn't that a lot of extra code for the same result?](#isnt-that-a-lot-of-extra-code-for-the-same-result)
+* [License](#license)
+
 ## Requirements
 
 * Python 3.12+
-  * dataclasses
-  * typing (`TypeAliasType`)
+    * dataclasses
+    * typing (`TypeAliasType`)
 * [faker](https://github.com/joke2k/faker)
 
 ## Example
@@ -14,12 +33,12 @@ See `example/run.py` for a full example. See `tests/FakeSchemaGenerator_test.py`
 ## How does it work?
 
 The `FakeSchemaGenerator` class takes a schema and generates data based on that schema. The schema is defined using the
-new style of type annotations. The `FakeSchemaGenerator` class uses the `faker` library to generate the data. When you
-register models with the `FakeSchemaGenerator` class, it creates a directed acyclic graph (DAG) of the fields and the
-order in which they need to be faked. Then, when you call the `generate_from_dag` method, it can create a data set that
-is valid for your schema across all models.
+`TypeAliasType` style of type annotations. The `FakeSchemaGenerator` class uses the `faker` library to generate the
+data. When you register models with the `FakeSchemaGenerator` class, it creates a directed acyclic graph (DAG) of the
+fields and the order in which they need to be faked. Then, when you call the `generate_from_dag` method, it can create a
+data set that is valid for your schema across all models.
 
-The resolution of the DAG is what enables the `ReferenceProvider` and `CalculateProvider` classes to work. The 
+The resolution of the DAG is what enables the `ReferenceProvider` and `CalculateProvider` classes to work. The
 `ReferenceProvider` class generates a value based on a reference to another table, and the `CalculateProvider` class
 calculates the value for a field depending on other field values. You could absolutely do this by hand, e.g.,
 
@@ -27,6 +46,7 @@ calculates the value for a field depending on other field values. You could abso
 from faker import Faker
 
 fake = Faker()
+
 
 class OrderProduct:
     def __init__(self):
@@ -56,6 +76,11 @@ Because the DAG is generated at the field level, `order_id` will be filled in wi
 reference `Order` and finally allowing `Order` to calculate `Order.total` from
 `OrderProduct.quantity * OrderProduct.unit_price`.
 
+Internally, the `FakeSchemaGenerator` creates copies of your classes and makes all of the fields optional. In this
+program, these are referred to as "interfaces" even though that's not in keeping with the traditional use of interface
+as an abstract base class. This optional form of construction is what allows the `FakeSchemaGenerator` to fill in the
+models and fields in DAG order, even if all of the fields defined on your class are required.
+
 ## Providers
 
 ### `CalculateProvider`
@@ -83,9 +108,11 @@ type TotalAmount = Annotated[
 This performs something similar to the following SQL query:
 
 ```sql
-SELECT SUM(unit_price * quantity) AS total
-FROM OrderProduct
-WHERE order_id = Order.id
+-- For the current row
+UPDATE Order
+SET total = (SELECT SUM(unit_price * quantity) AS total
+             FROM OrderProduct
+             WHERE Order.order_id = OrderProduct.id)
 ```
 
 ### `ReferenceProvider`
@@ -98,25 +125,30 @@ to generate a `customer_id` in the `Order` table that references an `id` in the 
 ...
 type CustomerID = Annotated[int, FakeType("reference", model="Customer", field="id")]
 ...
+
+
 class Order:
     ...
     customer_id: CustomerID
 ```
 
+If no `SchemaCondition`s are specified, the `ReferenceProvider` will choose a random model from the referenced table.
+
 ### `SequentialNumberProvider`
 
 A provider for `faker` that generates a sequential number based on a namespace. For instance, if you have a `Customer`
 table with an `id` field, you can use the `SequentialNumberProvider` to generate a unique `id` for each `Customer`.
-Basically the equivalent of an auto-incrementing primary key in a database.
+Basically the equivalent of an auto-incrementing primary key in a relational database.
 
 ```python
 ...
 type CustomerRowID = Annotated[int, FakeType("sequential_number", namespace="customer")]
 ...
+
+
 class Customer:
     id: CustomerRowID
 ```
-
 
 ## Types
 
@@ -147,17 +179,21 @@ type UnitPrice = Annotated[
 This is essentially the same as the following SQL query:
 
 ```sql
-SELECT price
-FROM Product
-WHERE product_id = OrderProduct.product_id
+-- For the current row
+UPDATE OrderProduct
+SET unit_price = (SELECT price
+                  FROM Product
+                  WHERE OrderProduct.product_id = Product.product_id)
 ```
 
 If you didn't specify the `ValueOf` annotation, the query would look like this:
 
 ```sql
-SELECT price
-FROM Product
-WHERE product_id = 'product_id'
+-- For the current row
+UPDATE OrderProduct
+SET unit_price = (SELECT price
+                  FROM Product
+                  WHERE OrderProduct.product_id = 'product_id')
 ```
 
 ### `SchemaCondition`
@@ -166,13 +202,53 @@ A type annotation that specifies a condition to use in a calculation. The `Schem
 `operator`, and `value` argument that specifies the field to compare, the operator to use, and the value to compare. An
 example of its use can be seen above in the `ValueOf` annotation.
 
+In general, a `SchemaCondition` is used to provide SQL-like `JOIN` functionality between models. So you have the
+following:
+
+* `source_model`: The model attempting to reference another model using a `SchemaCondition`.
+* `model`: The model being referenced.
+* `field`: The field in the `model` to reference.
+* `SchemaCondition`
+    * `field`: The field in the `source_model` being used for comparison.
+    * `operator`: The operator to use in the comparison.
+    * `value`: The value to compare against. If you want the value of the field in `model`, use `ValueOf`.
+
+An example from [the example](example/example_types.py) lines 49-57 follows:
+
+```python
+# UnitPrice is part of the OrderProduct model.
+type UnitPrice = Annotated[
+    float,
+    FakeType(
+        "reference",
+        model="Product",
+        field="price",
+        conditions=[SchemaCondition("product_id", operator.eq, ValueOf("product_id"))],
+    ),
+]
+```
+
+This says that when faking an `OrderProduct`, make sure to pull the `price` from the `Product` model where the 
+`product_id` in the `Product` model is equal to the `product_id` in the `OrderProduct` model. Or, in SQL:
+
+```sql
+-- For the current row
+UPDATE OrderProduct
+SET unit_price = (SELECT price
+                  FROM Product
+                  WHERE OrderProduct.product_id = Product.product_id)
+```
+
+Again, note that without the `ValueOf` annotation for the `Product.product_id` field, the comparison would be against
+the literal string `"product_id"` rather than value of the `product_id` field in the `Product` model.
+
 ## Questions
 
 ### Why do I need Fake Schema Generator?
 
 Faker is great for generating random values for test data, but it can be a bit difficult to generate a large amount of
-data with a consistent schema. This script allows you to supply a Python schema based on the `TypeAliasType` style of type
-annotations and generate data based on that schema.
+data with a consistent schema. This script allows you to supply a Python schema based on the `TypeAliasType` style of
+type annotations and generate data based on that schema.
 
 ### I have no clue what you're talking about.
 
@@ -187,6 +263,7 @@ class Customer:
         self.name = name
         self.email = email
         self.phone = phone
+
 
 fake = Faker()
 customers = [Customer(fake.name(), fake.email(), fake.phone_number()) for _ in range(3)]
@@ -214,7 +291,7 @@ class Customer:
         self.email = email
         self.phone = phone
 
-        
+
 class Orders:
     def __init__(self, order_id: int, customer_id: int, order_date: str, total: float):
         self.id = order_id
@@ -224,8 +301,8 @@ class Orders:
 
 
 fake = Faker()
-customers = [Customer(i+1, fake.name(), fake.email(), fake.phone_number()) for i in range(3)]
-orders = [Orders(i+1,
+customers = [Customer(i + 1, fake.name(), fake.email(), fake.phone_number()) for i in range(3)]
+orders = [Orders(i + 1,
                  fake.random_int(1, 3),
                  fake.date_this_year(),
                  fake.pyfloat(positive=True, min_value=0.01, max_value=100, right_digits=2)) for i in range(3)]
@@ -258,7 +335,6 @@ from typing import Annotated
 
 from fake_schema_generator import FakeSchemaGenerator
 from fake_schema_generator import FakeType
-
 
 type CustomerRowID = Annotated[int, FakeType("sequential_number", namespace="customer")]
 type Name = Annotated[str, FakeType("name")]
@@ -310,6 +386,12 @@ for i in range(3):
 
 ### Isn't that a lot of extra code for the same result?
 
-Yes, but no matter how large your schema is, you can generate all of the data through type annotations. It lets you
-separate your schema from your data generation, which can be useful if you're generating a lot of data or you just like
-maintaining a clean separation of concerns.
+It's a little extra code, but there are some pretty serious benefits:
+
+* You get more realistic-seeming fake data that's actually suitable for input into a relational database.
+* You can separate your schema types from the data generation process, making your code more readable and maintainable.
+* You can generate a large amount of data with a consistent schema in a single step.
+
+## License
+
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
