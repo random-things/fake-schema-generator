@@ -166,22 +166,30 @@ class FakeSchemaGenerator:
         self._build_field_dag()
 
     def _model_str_to_model(self, model_str: str) -> dataclass:
-        frame = currentframe()
-        while frame.f_back:
-            if model_str in frame.f_globals:
-                model: dataclass = frame.f_globals[model_str]
-                if is_dataclass(model):
-                    return model
-            else:
-                frame = frame.f_back
+        # Easiest path forward.
         if model_str in self._models:
             model: dataclass = self._models.get(model_str, None) or globals()[model_str]
             if is_dataclass(model):
                 return model
             else:
                 raise ValueError(f"Model {model_str} is not a dataclass")
-        else:
-            raise ValueError(f"Model {model_str} not found")
+
+        # Otherwise, we have to search the frames...
+        frame = currentframe()
+        try:
+            while frame.f_back:
+                if model_str in frame.f_globals:
+                    model: dataclass = frame.f_globals[model_str]
+                    if is_dataclass(model):
+                        return model
+                else:
+                    new_frame = frame.f_back
+                    del frame
+                    frame = new_frame
+        finally:
+            del frame
+
+        raise ValueError(f"Model {model_str} not found")
 
     def _register[T](self, model: type[T]) -> None:
         if model.__name__ not in self._models:
