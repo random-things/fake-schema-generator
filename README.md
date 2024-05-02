@@ -388,9 +388,21 @@ for i in range(3):
 
 It's a little extra code, but there are some pretty serious benefits:
 
-* You get more realistic-seeming fake data that's actually suitable for input into a relational database.
-* You can separate your schema types from the data generation process, making your code more readable and maintainable.
-* You can generate a large amount of data with a consistent schema in a single step.
+* Referential integrity
+  * Ensures foreign key constraints are respected which lets you test joins, subqueries, and transactions in a way that
+    mimics a production database.
+* Realistic data interaction
+  * The data reflects real-world relationships between tables which helps you test your application logic.
+* Early testing of constraints and validation
+  * You can identify potential constraint violations and logic errors more quickly.
+* Faster development
+  * You'll save time by not having to manually keep track of the order of dependencies in your schema.
+  * You'll also avoid some types of errors during the setup and testing process, so you can focus on functionality.
+* Easier maintenance
+  * If you need to change the schema, you only need to change the schema in one place.
+  * If you need to add a new field, you only need to add it to the model and it will be integrated with the rest of the schema.
+  * If you need to add a new model, you may not need to do anything if the model is referenced by an already existing model.
+  * If you need to add a new referring provider, there's code on which to base your custom provider.
 
 ## License
 
