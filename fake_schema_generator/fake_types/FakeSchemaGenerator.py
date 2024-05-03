@@ -41,7 +41,6 @@ class FakeSchemaGenerator:
         self._fake.add_provider(ref_provider)
 
         self._annotations: dict[dataclass, dict[str, Any]] = {}
-        self._data: dict[str, list[dataclass]] = {}
         self._raw_data: dict[str, list[dataclass]] = {}
         self._models: dict[str, dataclass] = {}
         self._interfaces: dict[str, dataclass] = {}
@@ -49,14 +48,33 @@ class FakeSchemaGenerator:
         self._field_dag: list[tuple[str, str]] = []
         self._field_dependencies: dict[tuple[str, str], set[tuple[str, str]]] = {}
         self._model_dependencies: dict[str, set[str]] = {}
-        self._field_populated: dict[tuple[str, str], bool] = {}
 
     @staticmethod
-    def _has_field(cls: dataclass, field: str) -> bool:
+    def _has_field(cls: type[dataclass], field: str) -> bool:
+        """
+        Check if a field exists in a dataclass.
+
+        Args:
+            cls (type[dataclass]): The class
+            field (str): The field to check for.
+
+        Returns:
+            bool: True if the field is in the class, False otherwise.
+        """
         return field in [f.name for f in dataclass_fields(cls)]
 
     @staticmethod
     def _has_keyword_argument(func: Callable, kwarg: str) -> bool:
+        """
+        Check if a function has a keyword argument.
+
+        Args:
+            func (Callable): The function to check.
+            kwarg (str): The keyword argument to check for.
+
+        Returns:
+            bool: True if the function has the keyword argument, False otherwise.
+        """
         sig: Signature = signature(func)
         params: MappingProxyType[str, Parameter] = sig.parameters
         has_argument = (kwarg in params and params[kwarg].default is not Parameter.empty) or any(
@@ -64,10 +82,30 @@ class FakeSchemaGenerator:
         )
         return has_argument
 
-    def _add_referring_provider(self, functions: set[str]):
+    def _add_referring_provider(self, functions: set[str]) -> None:
+        """
+        Informs the `FakeSchemaGenerator` of functions that are registered with Faker and should be handled by the `FakeSchemaGenerator`.
+
+        Args:
+            functions (set[str]): A set of functions to register as being handled by the `FakeSchemaGenerator`.
+
+        Returns:
+            None
+        """
         self._dependent_fake_providers.update(functions)
 
+        return None
+
     def _build_field_dag(self):
+        """
+        Build the field DAG from the field dependencies.
+
+        Sets:
+            self._field_dag: The field DAG.
+
+        Returns:
+            None
+        """
         schema = self._field_dependencies
 
         # First, remove independent tables from the schema.
@@ -111,20 +149,31 @@ class FakeSchemaGenerator:
 
         self._field_dag = sorted_fields
 
-    def _build_field_dependencies(self):
+        return None
+
+    def _build_field_dependencies(self) -> None:
+        """
+        Build the field dependencies from the type annotations on each registered model.
+
+        Sets:
+            self._field_dependencies: The field dependencies.
+
+        Returns:
+            None
+        """
         models_to_register: set[dataclass] = set()
         for model in self._models.values():
+            model_name: str = model.__name__
             for field in dataclass_fields(model):
-                self._field_populated[(model.__name__, field.name)] = False
-                if len(self._annotations[model.__name__][field.name]["metadata"]) > 0:
+                if len(self._annotations[model_name][field.name]["metadata"]) > 0:
                     fake_type = next(
                         filter(
                             lambda x: isinstance(x, FakeType),
-                            self._annotations[model.__name__][field.name]["metadata"],
+                            self._annotations[model_name][field.name]["metadata"],
                         ),
                         None,
                     )
-                    current_field: tuple[str, str] = (model.__name__, field.name)
+                    current_field: tuple[str, str] = (model_name, field.name)
                     if fake_type and fake_type.type in self._dependent_fake_providers:
                         if current_field not in self._field_dependencies:
                             self._field_dependencies[current_field] = set()
@@ -146,11 +195,23 @@ class FakeSchemaGenerator:
 
         if len(models_to_register) > 0:
             for model in models_to_register:
-                self._register(model)
-                self._model_dependencies[model.__name__] = set()
+                model_name: str = model.__name__
+                self.register(model)
+                self._model_dependencies[model_name] = set()
             self._build_field_dependencies()
 
-    def _build_model_dependencies(self):
+        return None
+
+    def _build_model_dependencies(self) -> None:
+        """
+        Build the model dependencies from the field dependencies, then build the field DAG.
+
+        Sets:
+            self._model_dependencies: The model dependencies.
+
+        Returns:
+            None
+        """
         self._build_field_dependencies()
 
         # Iterate through the field DAG and build the model DAG.
@@ -165,10 +226,25 @@ class FakeSchemaGenerator:
 
         self._build_field_dag()
 
-    def _model_str_to_model(self, model_str: str) -> dataclass:
+        return None
+
+    def _model_str_to_model(self, model_str: str) -> type[dataclass]:
+        """
+        Converts a model string to a model type.
+
+        Args:
+            model_str (str): The name of the model to find.
+
+        Returns:
+            type[dataclass]: The model.
+
+        Raises:
+            ValueError: If the model is not a dataclass.
+            ValueError: If the model is not found.
+        """
         # Easiest path forward.
         if model_str in self._models:
-            model: dataclass = self._models.get(model_str, None) or globals()[model_str]
+            model: type[dataclass] = self._models.get(model_str, None) or globals()[model_str]
             if is_dataclass(model):
                 return model
             else:
@@ -179,7 +255,7 @@ class FakeSchemaGenerator:
         try:
             while frame.f_back:
                 if model_str in frame.f_globals:
-                    model: dataclass = frame.f_globals[model_str]
+                    model: type[dataclass] = frame.f_globals[model_str]
                     if is_dataclass(model):
                         return model
                 else:
@@ -191,14 +267,6 @@ class FakeSchemaGenerator:
 
         raise ValueError(f"Model {model_str} not found")
 
-    def _register[T](self, model: type[T]) -> None:
-        if model.__name__ not in self._models:
-            self._annotations[model.__name__] = extract_annotations(model)
-            self._models[model.__name__] = model
-            self._interfaces[model.__name__] = dataclass_to_interface(model)
-            self._data[model.__name__] = []
-            self._raw_data[model.__name__] = []
-
     def calculate(
         self,
         source_model: dataclass,
@@ -209,6 +277,26 @@ class FakeSchemaGenerator:
         row_op: Optional[Callable] = noop,
         col_op: Optional[Callable] = noop,
     ) -> Any:
+        """
+        Calculate a field in `source_model` based on values from `model`.
+
+        Args:
+            source_model (dataclass): The model whose field is being filled in by the calculation
+            model (str | type[dataclass]): The model from which to calculate the value.
+            field (str): The field used to join the `source_model` to the `model`.
+            value (Any): The value used to join the `source_model` to the `model`.
+            fields (list[str]): The fields to use in the calculation.
+            row_op (Optional[Callable], optional): The operation to perform on the row. Defaults to `noop`.
+            col_op (Optional[Callable], optional): The operation to perform on the column. Defaults to `noop`.
+
+        Returns:
+            Any: The calculated value.
+
+        Raises:
+            ValueError: If the `model` is not found in the models.
+            ValueError: If the `field` is not found in the `model`.
+            ValueError: If any of the `fields` are not found in the `model`.
+        """
         if len(fields) == 0:
             raise ValueError("At least one field is required")
 
@@ -242,7 +330,45 @@ class FakeSchemaGenerator:
             else:
                 return col_op(col_values)
 
-    def generate_from_dag(self):
+    def data(
+        self, model: Optional[str | type[dataclass]] = None
+    ) -> list[dataclass] | dict[str, list[dataclass]] | None:
+        """
+        Get the data generated for a specific model or all models.
+
+        Args:
+            model (Optional[str | type[dataclass]]): The model for which you want to get data. Defaults to None.
+
+        Returns:
+            list[dataclass]: When `model` is specified.
+            dict[str, list[dataclass]]: When `model` is None and there is data.
+            None: When `model` is None and there is no data or the model is not found.
+        """
+        if model is not None:
+            if isinstance(model, str):
+                model = self._model_str_to_model(model)
+
+            model_name = model.__name__
+            if model_name not in self._raw_data:
+                return None
+
+            return self._raw_data[model_name]
+
+        if len(self._raw_data) == 0:
+            return None
+
+        return self._raw_data
+
+    def generate(self) -> None:
+        """
+        A convenience wrapper around `generate_from_dag`. Generated data is accessible via the `data` method.
+        """
+        self.generate_from_dag()
+
+    def generate_from_dag(self) -> None:
+        """
+        Generates data for the registered schema. Generated data is accessible via the `data` method.
+        """
         if len(self._model_dependencies) == 0:
             self._build_model_dependencies()
 
@@ -275,25 +401,45 @@ class FakeSchemaGenerator:
     def reference(
         self,
         source_model: dataclass,
-        model: type[dataclass] | str,
+        model: str | type[dataclass],
         field: Optional[Any] = None,
         conditions: Optional[list[SchemaCondition]] = None,
     ) -> Any:
+        """
+        Reference a value from another model.
+
+        Args:
+            source_model (dataclass): The model whose field is being filled in by the reference.
+            model (str | type[dataclass]): The model from which to reference the value.
+            field (Optional[Any], optional): The field to return. Defaults to None.
+            conditions (Optional[list[SchemaCondition]], optional): The conditions to use in the reference. Defaults to None.
+
+        Returns:
+            Any: The referenced value.
+
+        Raises:
+            ValueError: If the `model` is not found in the models.
+            ValueError: If the `field` is not found in the `model`.
+            ValueError: If the `field` is not found in the `source_model`.
+            ValueError: If the `conditions` are not met.
+            ValueError: If no data is found for the `model` and `field`.
+        """
         if isinstance(model, str):
             model = self._model_str_to_model(model)
 
-        if model.__name__ not in self._models:
-            self._register(model)
+        model_name: str = model.__name__
+        if model_name not in self._models:
+            self.register(model)
 
         if field and not self._has_field(model, field):
-            raise ValueError(f"Field {field} not found in model {model.__name__}")
+            raise ValueError(f"Field {field} not found in model {model_name}")
 
-        if len(self._raw_data[model.__name__]) == 0 and len(self._instances[model.__name__]) == 0:
-            raise ValueError(f"No data found for model {model.__name__}.{field}")
+        if len(self._raw_data[model_name]) == 0 and len(self._instances[model_name]) == 0:
+            raise ValueError(f"No data found for model {model_name}.{field}")
 
         obj: type[dataclass] | None = None
-        if len(self._raw_data[model.__name__]) > 0 or len(self._instances[model.__name__]) > 0:
-            combined_data = self._raw_data[model.__name__] + self._instances[model.__name__]
+        if len(self._raw_data[model_name]) > 0 or len(self._instances[model_name]) > 0:
+            combined_data = self._raw_data[model_name] + self._instances[model_name]
             if field is not None and conditions is not None:
                 for instance in combined_data:
                     if all(
@@ -314,6 +460,22 @@ class FakeSchemaGenerator:
             elif field is not None:
                 obj = random.choice(combined_data)
         else:
-            obj = random.choice(self._instances[model.__name__])
+            obj = random.choice(self._instances[model_name])
 
         return getattr(obj, field)
+
+    def register(self, model: dataclass) -> None:
+        """
+        Register a model with the schema generator.
+
+        Args:
+            model (dataclass): The model to register with the schema generator.
+
+        Returns:
+            None
+        """
+        if model.__name__ not in self._models:
+            self._annotations[model.__name__] = extract_annotations(model)
+            self._models[model.__name__] = model
+            self._interfaces[model.__name__] = dataclass_to_interface(model)
+            self._raw_data[model.__name__] = []

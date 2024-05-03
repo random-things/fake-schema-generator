@@ -14,16 +14,16 @@ from fake_schema_generator import FakeSchemaGenerator
 
 def fake_load():
     sg = FakeSchemaGenerator()
-    sg._register(Customer)
-    sg._register(Product)
-    sg._register(Order)
-    sg._register(OrderProduct)
-    sg._register(Payment)
+    sg.register(Customer)
+    sg.register(Product)
+    sg.register(Order)
+    sg.register(OrderProduct)
+    sg.register(Payment)
 
     for _ in range(0, 100):
-        sg.generate_from_dag()
+        sg.generate()
 
-    print(sg._raw_data)
+    print(sg.data())
 
 
 if __name__ == "__main__":

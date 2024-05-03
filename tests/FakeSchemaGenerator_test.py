@@ -95,7 +95,7 @@ class TestFakeSchemaGenerator:
         assert schema_generator is not None
 
     def test_basic_schema(self, schema_generator):
-        schema_generator._register(Customer)
+        schema_generator.register(Customer)
         schema_generator._build_model_dependencies()
         assert schema_generator._models == {"Customer": Customer}
         assert schema_generator._model_dependencies == {"Customer": set()}
@@ -110,12 +110,12 @@ class TestFakeSchemaGenerator:
         ]
 
     def test_pulls_in_related_schema(self, schema_generator):
-        schema_generator._register(CustomerDetails)
+        schema_generator.register(CustomerDetails)
         schema_generator._build_model_dependencies()
         assert "Customer" in schema_generator._models
 
     def test_related_schema(self, schema_generator):
-        schema_generator._register(CustomerDetails)
+        schema_generator.register(CustomerDetails)
         schema_generator._build_model_dependencies()
         assert schema_generator._models == {"Customer": Customer, "CustomerDetails": CustomerDetails}
         assert schema_generator._model_dependencies == {"Customer": set(), "CustomerDetails": {"Customer"}}
@@ -135,7 +135,7 @@ class TestFakeSchemaGenerator:
         ]
 
     def test_calculating_schema(self, schema_generator):
-        schema_generator._register(Product)
+        schema_generator.register(Product)
         schema_generator._build_model_dependencies()
         schema_generator.generate_from_dag()
         assert schema_generator._raw_data["Product"] == [
@@ -152,7 +152,7 @@ class TestFakeSchemaGenerator:
         ]
 
     def test_schema_with_circular_model_dependencies(self, schema_generator):
-        schema_generator._register(OrderProduct)
+        schema_generator.register(OrderProduct)
         schema_generator._build_model_dependencies()
         assert all(model in schema_generator._models for model in ["Product", "Order", "OrderProduct", "Customer"])
         # Because CustomerDetails isn't registered or referenced by any of the tables in the schema, it shouldn't be

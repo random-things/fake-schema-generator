@@ -3,7 +3,9 @@
 ## Table of Contents
 
 * [Requirements](#requirements)
+* [Installation](#installation)
 * [Example](#example)
+* [Tests](#tests)
 * [How does it work?](#how-does-it-work)
 * [Providers](#providers)
     * [`CalculateProvider`](#calculateprovider)
@@ -30,9 +32,44 @@
     * typing (`TypeAliasType`)
 * [faker](https://github.com/joke2k/faker)
 
+## Installation
+
+With the git repository cloned locally and poetry already installed:
+
+```
+poetry install
+```
+
 ## Example
 
-See `example/run.py` for a full example. See `tests/FakeSchemaGenerator_test.py` for more examples.
+See [example/run.py](example/run.py) for a full example.
+See [tests/FakeSchemaGenerator_test.py](tests/FakeSchemaGenerator_test.py) for more examples.
+
+To run the example:
+
+```
+# From the project root
+poetry run python example/run.py
+```
+
+## Tests
+
+The tests are automatically run in the Dockerfile, so if you want to run them without installing anything locally:
+```
+docker build -t fake_schema_generator .
+docker run --name fsg fake_schema_generator
+
+# [Optional] Clean up container and image
+docker rm fsg
+docker rmi fake_schema_generator
+```
+
+To run the tests locally:
+
+```
+# From the project root
+poetry run pytest tests
+```
 
 ## How does it work?
 
@@ -246,7 +283,7 @@ type UnitPrice = Annotated[
 ]
 ```
 
-This says that when faking an `OrderProduct`, make sure to pull the `price` from the `Product` model where the 
+This says that when faking an `OrderProduct`, make sure to pull the `price` from the `Product` model where the
 `product_id` in the `Product` model is equal to the `product_id` in the `OrderProduct` model. Or, in SQL:
 
 ```sql
@@ -382,16 +419,16 @@ class Order:
 
 
 fake = FakeSchemaGenerator()
-fake._register(Order)
+fake.register(Order)
 
 for i in range(3):
-    fake.generate_from_dag()
+    fake.generate()
 
 for i in range(3):
-    print(fake._raw_data["Customer"][i])
+    print(fake.data(["Customer"][i]))
 
 for i in range(3):
-    print(fake._raw_data["Order"][i])
+    print(fake.data(["Order"][i]))
 
 # Output:
 # Customer(id=1, name='Shane Gross', email='lopezchristopher@example.org', phone='(826)717-3333')
@@ -407,20 +444,23 @@ for i in range(3):
 It's a little extra code, but there are some pretty serious benefits:
 
 * Referential integrity
-  * Ensures foreign key constraints are respected which lets you test joins, subqueries, and transactions in a way that
-    mimics a production database.
+    * Ensures foreign key constraints are respected which lets you test joins, subqueries, and transactions in a way
+      that
+      mimics a production database.
 * Realistic data interaction
-  * The data reflects real-world relationships between tables which helps you test your application logic.
+    * The data reflects real-world relationships between tables which helps you test your application logic.
 * Early testing of constraints and validation
-  * You can identify potential constraint violations and logic errors more quickly.
+    * You can identify potential constraint violations and logic errors more quickly.
 * Faster development
-  * You'll save time by not having to manually keep track of the order of dependencies in your schema.
-  * You'll also avoid some types of errors during the setup and testing process, so you can focus on functionality.
+    * You'll save time by not having to manually keep track of the order of dependencies in your schema.
+    * You'll also avoid some types of errors during the setup and testing process, so you can focus on functionality.
 * Easier maintenance
-  * If you need to change the schema, you only need to change the schema in one place.
-  * If you need to add a new field, you only need to add it to the model and it will be integrated with the rest of the schema.
-  * If you need to add a new model, you may not need to do anything if the model is referenced by an already existing model.
-  * If you need to add a new referring provider, there's code on which to base your custom provider.
+    * If you need to change the schema, you only need to change the schema in one place.
+    * If you need to add a new field, you only need to add it to the model and it will be integrated with the rest of
+      the schema.
+    * If you need to add a new model, you may not need to do anything if the model is referenced by an already existing
+      model.
+    * If you need to add a new referring provider, there's code on which to base your custom provider.
 
 ## License
 

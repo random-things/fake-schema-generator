@@ -6,6 +6,21 @@ type SupportsProduct = int | float | Decimal
 
 
 def typed_product(sequence: Sequence[SupportsProduct]) -> SupportsProduct | None:
+    """
+    Multiply the numbers in the sequence together.
+
+    Types:
+        SupportsProduct: int | float | Decimal
+
+    Args:
+        sequence (Sequence[SupportsProduct]): A sequence of numbers to multiply.
+
+    Returns:
+        SupportsProduct: The product of the numbers in the sequence.
+
+    Raises:
+        TypeError: If the sequence contains an unsupported type.
+    """
     if not sequence:
         return None
 

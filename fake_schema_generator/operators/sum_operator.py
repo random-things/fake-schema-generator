@@ -6,6 +6,21 @@ type SupportsSum = int | float | Decimal
 
 
 def typed_sum(sequence: Sequence[SupportsSum]) -> SupportsSum | None:
+    """
+    Sum the numbers in the sequence.
+
+    Types:
+        SupportsSum: int | float | Decimal
+
+    Args:
+        sequence (Sequence[SupportsSum]): A sequence of numbers to add together.
+
+    Returns:
+        SupportsSum: The sum of the numbers in the sequence.
+
+    Raises:
+        TypeError: If the sequence contains an unsupported type.
+    """
     if not sequence:
         return None
 
